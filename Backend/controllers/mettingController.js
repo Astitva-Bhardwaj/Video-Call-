@@ -47,8 +47,10 @@ exports.joinMeeting = async (req, res) => {
       return res.status(400).json({ error: 'This meeting has ended' });
     }
 
-    if (meeting.participants.length >= 2) {
-      return res.status(400).json({ error: 'Meeting is full' });
+    console.log(`User ${req.user._id} attempting to join meeting ${req.params.meetingId}. Current participants: ${meeting.participants.length}`);
+
+    if (meeting.participants.length >= 10) {
+      return res.status(400).json({ error: 'Meeting is full. The maximum number of participants is 10.' });
     }
 
     if (!meeting.participants.includes(req.user._id)) {
