@@ -14,7 +14,7 @@ const VideoRoom = () => {
     socketRef.current = io('http://localhost:8000', {
       withCredentials: true,
     });
-    
+
     const initCall = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -76,26 +76,29 @@ const VideoRoom = () => {
   }, [roomId]);
 
   const handleUserConnected = async (userId) => {
-    console.log('Creating offer for user:', userId);
-    const offer = await peerConnectionRef.current.createOffer();
-    await peerConnectionRef.current.setLocalDescription(offer);
-    socketRef.current.emit('offer', offer, roomId);
+    // Only create an offer if we are the first user
+    if (!peerConnectionRef.current) {
+      console.log('Creating offer for user:', userId);
+      const offer = await peerConnectionRef.current.createOffer();
+      await peerConnectionRef.current.setLocalDescription(offer);
+      socketRef.current.emit('offer', { offer, userId }, roomId);
+    }
   };
 
-  const handleReceiveOffer = async (offer, userId) => {
+  const handleReceiveOffer = async ({ offer, userId }) => {
     console.log('Received offer from user:', userId);
     await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await peerConnectionRef.current.createAnswer();
     await peerConnectionRef.current.setLocalDescription(answer);
-    socketRef.current.emit('answer', answer, roomId);
+    socketRef.current.emit('answer', { answer, userId }, roomId);
   };
 
-  const handleReceiveAnswer = async (answer, userId) => {
+  const handleReceiveAnswer = async ({ answer, userId }) => {
     console.log('Received answer from user:', userId);
     await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
   };
 
-  const handleNewICECandidate = async (candidate, userId) => {
+  const handleNewICECandidate = async ({ candidate, userId }) => {
     try {
       console.log('Received ICE candidate from user:', userId);
       await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
