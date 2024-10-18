@@ -47,6 +47,11 @@ io.on("connection", (socket) => {
     const room = io.sockets.adapter.rooms.get(roomId) || { size: 0 };
     const numClients = room.size;
 
+    if (rooms.has(socket.id)) {
+      console.log(`User ${socket.id} already in room ${rooms.get(socket.id)}`);
+      return;
+    }
+
     // These events are sent back only to the caller
     if (numClients === 0) {
       socket.join(roomId);
