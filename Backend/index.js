@@ -57,7 +57,7 @@ io.on("connection", (socket) => {
       socket.join(roomId);
       socket.emit('room-created');
       console.log(`Room ${roomId} created by user ${socket.id}`);
-    } else if (numClients === 1) {
+    } else if (numClients >=1 ) {
       socket.join(roomId);
       socket.emit('room-joined');
       socket.to(roomId).emit('start-call');
