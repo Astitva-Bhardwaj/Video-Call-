@@ -1,37 +1,50 @@
 import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
-import { AuthContext } from '../../contexts/AuthContext'; // Make sure this path is correct
-import axios from 'axios'; // Ensure axios is installed
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../../contexts/AuthContext';
+import axios from 'axios';
 
 const Register = () => {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { setAuth } = useContext(AuthContext); // Using Auth context for setting auth state
-  const navigate = useNavigate(); // Initialize useNavigate
+  const [error, setError] = useState('');
+  const { setAuth } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    setError('');
     try {
       const response = await axios.post('http://localhost:8000/api/auth/register', {
         username,
+        email,
         password,
       });
-      setAuth(response.data.token); // Save the token in Auth context
-      navigate('/login'); // Navigate to login after successful registration
+      console.log('Registration successful:', response.data);
+      navigate('/login');
     } catch (error) {
-      console.error('Error during registration:', error);
+      console.error('Error during registration:', error.response?.data?.error || error.message);
+      setError(error.response?.data?.error || 'An error occurred during registration');
     }
   };
 
   return (
     <div>
       <h2>Register</h2>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
       <form onSubmit={handleRegister}>
         <input
           type="text"
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          required
+        />
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           required
         />
         <input
