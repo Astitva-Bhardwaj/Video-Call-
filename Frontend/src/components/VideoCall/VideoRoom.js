@@ -9,6 +9,7 @@ const VideoRoom = () => {
   const peerConnectionRef = useRef(null);
   const socketRef = useRef(null);
   const [localStream, setLocalStream] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     socketRef.current = io('http://localhost:8000', {
@@ -45,11 +46,15 @@ const VideoRoom = () => {
           }
         };
 
-        socketRef.current.emit('join-room', roomId, socketRef.current.id);
+        peerConnectionRef.current.oniceconnectionstatechange = () => {
+          console.log(`ICE connection state: ${peerConnectionRef.current.iceConnectionState}`);
+        };
 
-        socketRef.current.on('user-connected', (userId) => {
-          console.log('User connected:', userId);
-          handleUserConnected(userId);
+        socketRef.current.emit('join-room', roomId);
+
+        socketRef.current.on('user-connected', () => {
+          console.log('Another user connected, initiating call');
+          handleCallInitiation();
         });
 
         socketRef.current.on('offer', handleReceiveOffer);
@@ -57,6 +62,7 @@ const VideoRoom = () => {
         socketRef.current.on('ice-candidate', handleNewICECandidate);
       } catch (error) {
         console.error('Error setting up call:', error);
+        setError('Failed to set up call. Please check your camera and microphone permissions.');
       }
     };
 
@@ -75,41 +81,72 @@ const VideoRoom = () => {
     };
   }, [roomId]);
 
-  const handleUserConnected = async (userId) => {
-    // Only create an offer if we are the first user
-    if (!peerConnectionRef.current) {
-      console.log('Creating offer for user:', userId);
+  const handleCallInitiation = async () => {
+    try {
       const offer = await peerConnectionRef.current.createOffer();
       await peerConnectionRef.current.setLocalDescription(offer);
-      socketRef.current.emit('offer', { offer, userId }, roomId);
+      console.log('Sending offer');
+      socketRef.current.emit('offer', offer, roomId);
+    } catch (error) {
+      console.error('Error creating offer:', error);
+      setError('Failed to initiate call. Please try again.');
     }
   };
 
-  const handleReceiveOffer = async ({ offer, userId }) => {
-    console.log('Received offer from user:', userId);
-    await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await peerConnectionRef.current.createAnswer();
-    await peerConnectionRef.current.setLocalDescription(answer);
-    socketRef.current.emit('answer', { answer, userId }, roomId);
-  };
+  const handleReceiveOffer = async (offer) => {
+    console.log('Received offer');
+    
+    if (!peerConnectionRef.current) {
+      console.error('PeerConnection not initialized');
+      return;
+    }
 
-  const handleReceiveAnswer = async ({ answer, userId }) => {
-    console.log('Received answer from user:', userId);
-    await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-  };
+    if (peerConnectionRef.current.signalingState !== "stable") {
+      console.warn("PeerConnection is not in stable state. Ignoring offer.");
+      return;
+    }
 
-  const handleNewICECandidate = async ({ candidate, userId }) => {
     try {
-      console.log('Received ICE candidate from user:', userId);
+      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+      
+      if (peerConnectionRef.current.signalingState === "have-remote-offer") {
+        const answer = await peerConnectionRef.current.createAnswer();
+        await peerConnectionRef.current.setLocalDescription(answer);
+        console.log('Sending answer');
+        socketRef.current.emit('answer', answer, roomId);
+      } else {
+        console.warn("Unexpected signaling state after setting remote description:", peerConnectionRef.current.signalingState);
+      }
+    } catch (error) {
+      console.error('Error handling offer:', error);
+      setError('Failed to process incoming call. Please try reconnecting.');
+    }
+  };
+
+  const handleReceiveAnswer = async (answer) => {
+    console.log('Received answer');
+    try {
+      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+    } catch (error) {
+      console.error('Error setting remote description:', error);
+      setError('Failed to establish connection. Please try again.');
+    }
+  };
+
+  const handleNewICECandidate = async (candidate) => {
+    try {
+      console.log('Received ICE candidate');
       await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
     } catch (error) {
       console.error('Error adding ICE candidate:', error);
+      // This error is not critical, so we don't set the error state
     }
   };
 
   return (
     <div className="video-room">
       <h2>Meeting ID: {roomId}</h2>
+      {error && <div className="error-message">{error}</div>}
       <div className="video-container">
         <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '300px', height: '200px' }} />
         <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '300px', height: '200px' }} />

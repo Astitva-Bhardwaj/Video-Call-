@@ -43,38 +43,8 @@ io.on("connection", (socket) => {
 
   socket.on("join-room", (roomId) => {
     console.log(`User ${socket.id} joining room ${roomId}`);
-    
-    const room = io.sockets.adapter.rooms.get(roomId) || { size: 0 };
-    const numClients = room.size;
-
-    if (rooms.has(socket.id)) {
-      console.log(`User ${socket.id} already in room ${rooms.get(socket.id)}`);
-      return;
-    }
-
-    // These events are sent back only to the caller
-    if (numClients === 0) {
-      socket.join(roomId);
-      socket.emit('room-created');
-      console.log(`Room ${roomId} created by user ${socket.id}`);
-    } else if (numClients >=1 ) {
-      socket.join(roomId);
-      socket.emit('room-joined');
-      socket.to(roomId).emit('start-call');
-      console.log(`User ${socket.id} joined room ${roomId}. Starting call.`);
-    } else {
-      socket.emit('room-full');
-      console.log(`User ${socket.id} attempted to join full room ${roomId}`);
-      return;
-    }
-
-    rooms.set(socket.id, roomId);
-
-    socket.on("disconnect", () => {
-      console.log(`User ${socket.id} disconnected from room ${roomId}`);
-      socket.to(roomId).emit("user-disconnected", socket.id);
-      rooms.delete(socket.id);
-    });
+    socket.join(roomId);
+    socket.to(roomId).emit("user-connected");
   });
 
   socket.on("offer", (offer, roomId) => {
@@ -90,6 +60,10 @@ io.on("connection", (socket) => {
   socket.on("ice-candidate", (candidate, roomId) => {
     console.log(`ICE candidate received from ${socket.id} in room ${roomId}`);
     socket.to(roomId).emit("ice-candidate", candidate);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id);
   });
 });
 
