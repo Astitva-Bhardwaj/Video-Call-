@@ -2,13 +2,13 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../contexts/AuthContext';
 import axios from 'axios';
+import { TextField, Button, Typography, Container, Alert } from '@mui/material'; // Use MUI components
 
 const Register = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { setAuth } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleRegister = async (e) => {
@@ -16,47 +16,58 @@ const Register = () => {
     setError('');
     try {
       const response = await axios.post('http://localhost:8000/api/auth/register', {
-        username,
-        email,
-        password,
+        username, email, password
       });
-      console.log('Registration successful:', response.data);
       navigate('/login');
     } catch (error) {
-      console.error('Error during registration:', error.response?.data?.error || error.message);
       setError(error.response?.data?.error || 'An error occurred during registration');
     }
   };
 
   return (
-    <div>
-      <h2>Register</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+    <Container maxWidth="sm" sx={{ marginTop: 5 }}>
+      <Typography variant="h4" component="h2" gutterBottom>Register</Typography>
+      {error && <Alert severity="error">{error}</Alert>}
       <form onSubmit={handleRegister}>
-        <input
-          type="text"
-          placeholder="Username"
+        <TextField
+          label="Username"
+          variant="outlined"
+          fullWidth
+          margin="normal"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
         />
-        <input
-          type="email"
-          placeholder="Email"
+        <TextField
+          label="Email"
+          variant="outlined"
+          fullWidth
+          margin="normal"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
         />
-        <input
+        <TextField
+          label="Password"
+          variant="outlined"
+          fullWidth
+          margin="normal"
           type="password"
-          placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-        <button type="submit">Register</button>
+        <Button
+          type="submit"
+          variant="contained"
+          color="primary"
+          fullWidth
+          sx={{ marginTop: 2 }}
+        >
+          Register
+        </Button>
       </form>
-    </div>
+    </Container>
   );
 };
 

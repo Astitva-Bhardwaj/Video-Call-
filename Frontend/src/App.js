@@ -10,24 +10,38 @@ import CreateMeeting from './components/Meeting/CreateMeeting';
 import JoinMeeting from './components/Meeting/JoinMeeting';
 import VideoRoom from './components/VideoCall/VideoRoom';
 import './App.css';
+import { Box } from '@mui/material';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="App">
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: '100vh',
+          }}
+        >
+          {/* Header */}
           <Header />
-          <Routes>
-            <Route path="/" element={<Login />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/create-meeting" element={<CreateMeeting />} />
-            <Route path="/join-meeting" element={<JoinMeeting />} />
-            <Route path="/meeting/:id" element={<VideoRoom />} />
-          </Routes>
+
+          {/* Main Content */}
+          <Box component="main" sx={{ flexGrow: 1 }}>
+            <Routes>
+              <Route path="/" element={<Login />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/create-meeting" element={<CreateMeeting />} />
+              <Route path="/join-meeting" element={<JoinMeeting />} />
+              <Route path="/meeting/:id" element={<VideoRoom />} />
+            </Routes>
+          </Box>
+
+          {/* Footer */}
           <Footer />
-        </div>
+        </Box>
       </Router>
     </AuthProvider>
   );

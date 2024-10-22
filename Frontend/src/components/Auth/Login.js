@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../contexts/AuthContext';
 import axios from 'axios';
+import { TextField, Button, Typography, Container, Alert } from '@mui/material'; // Use MUI components
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -22,12 +23,9 @@ const Login = () => {
         { username, password },
         { 
           withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
         }
       );
-      console.log('Login response:', response.data);
       if (response.data.token) {
         login(response.data.token);
         navigate('/create-meeting');
@@ -35,31 +33,45 @@ const Login = () => {
         setError('Login failed: No token received');
       }
     } catch (error) {
-      console.error('Login error:', error.response?.data || error.message);
       setError(error.response?.data?.error || 'An error occurred during login');
     }
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h2>Login</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <input
-        type="text"
-        placeholder="Username or Email"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        required
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
-      <button type="submit">Login</button>
-    </form>
+    <Container maxWidth="sm" sx={{ marginTop: 5 }}>
+      <Typography variant="h4" component="h2" gutterBottom>Login</Typography>
+      {error && <Alert severity="error">{error}</Alert>}
+      <form onSubmit={handleSubmit}>
+        <TextField
+          label="Username or Email"
+          variant="outlined"
+          fullWidth
+          margin="normal"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+        />
+        <TextField
+          label="Password"
+          variant="outlined"
+          fullWidth
+          margin="normal"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <Button
+          type="submit"
+          variant="contained"
+          color="primary"
+          fullWidth
+          sx={{ marginTop: 2 }}
+        >
+          Login
+        </Button>
+      </form>
+    </Container>
   );
 };
 
