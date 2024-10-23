@@ -17,17 +17,13 @@ const io = socketIo(server, {
   }
 });
 
-const PORT = process.env.PORT || 8000;
-
 // Connect to MongoDB
 connectDB();
 
-app.use(
-  cors({
-    origin: "http://localhost:3000",
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: "http://localhost:3000",
+  credentials: true,
+}));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -35,38 +31,75 @@ app.use(cookieParser());
 app.use("/api/auth", authRoutes);
 app.use("/api/meetings", meetingRoutes);
 
-// WebSocket logic
+// Store active rooms and their participants
 const rooms = new Map();
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id);
 
+  // Join room handler
   socket.on("join-room", (roomId) => {
     console.log(`User ${socket.id} joining room ${roomId}`);
+    
     socket.join(roomId);
-    socket.to(roomId).emit("user-connected");
-  });
+    
+    // Initialize room if it doesn't exist
+    if (!rooms.has(roomId)) {
+      rooms.set(roomId, new Set());
+    }
+    
+    // Get existing users
+    const existingUsers = Array.from(rooms.get(roomId));
+    
+    // Add new user to room
+    rooms.get(roomId).add(socket.id);
+    
+    // Notify existing users about the new user
+    existingUsers.forEach(userId => {
+      io.to(userId).emit("user-joined", socket.id);
+    });
 
-  socket.on("offer", (offer, roomId) => {
-    console.log(`Offer received from ${socket.id} in room ${roomId}`);
-    socket.to(roomId).emit("offer", offer);
-  });
+    // Handle WebRTC signaling
+    socket.on("offer", ({ userId, offer }) => {
+      console.log(`Forwarding offer from ${socket.id} to ${userId}`);
+      io.to(userId).emit("offer", {
+        userId: socket.id,
+        offer: offer
+      });
+    });
 
-  socket.on("answer", (answer, roomId) => {
-    console.log(`Answer received from ${socket.id} in room ${roomId}`);
-    socket.to(roomId).emit("answer", answer);
-  });
+    socket.on("answer", ({ userId, answer }) => {
+      console.log(`Forwarding answer from ${socket.id} to ${userId}`);
+      io.to(userId).emit("answer", {
+        userId: socket.id,
+        answer: answer
+      });
+    });
 
-  socket.on("ice-candidate", (candidate, roomId) => {
-    console.log(`ICE candidate received from ${socket.id} in room ${roomId}`);
-    socket.to(roomId).emit("ice-candidate", candidate);
-  });
+    socket.on("ice-candidate", ({ userId, candidate }) => {
+      console.log(`Forwarding ICE candidate from ${socket.id} to ${userId}`);
+      io.to(userId).emit("ice-candidate", {
+        userId: socket.id,
+        candidate: candidate
+      });
+    });
 
-  socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
+    // Handle disconnection
+    socket.on("disconnect", () => {
+      console.log(`User ${socket.id} disconnected from room ${roomId}`);
+      if (rooms.has(roomId)) {
+        rooms.get(roomId).delete(socket.id);
+        if (rooms.get(roomId).size === 0) {
+          rooms.delete(roomId);
+        } else {
+          io.to(roomId).emit("user-left", socket.id);
+        }
+      }
+    });
   });
 });
 
+const PORT = process.env.PORT || 8000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
