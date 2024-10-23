@@ -1,15 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 
 const VideoRoom = () => {
   const { id: roomId } = useParams();
+  const navigate = useNavigate();
   const localVideoRef = useRef(null);
   const peerConnectionsRef = useRef({});
   const socketRef = useRef(null);
   const [localStream, setLocalStream] = useState(null);
   const [remoteStreams, setRemoteStreams] = useState({});
   const [error, setError] = useState(null);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
 
   // Initialize WebRTC
   const initializeMedia = async () => {
@@ -99,6 +101,35 @@ const VideoRoom = () => {
         delete newStreams[userId];
         return newStreams;
       });
+    }
+  };
+
+  // Handle ending the call
+  const handleEndCall = () => {
+    // Stop all tracks in the local stream
+    localStream?.getTracks().forEach(track => track.stop());
+    
+    // Close all peer connections
+    Object.values(peerConnectionsRef.current).forEach(pc => pc.close());
+    
+    // Disconnect socket
+    socketRef.current?.disconnect();
+    
+    // Notify other participants that we're leaving
+    socketRef.current?.emit('leave-room', roomId);
+    
+    // Navigate back to home or another appropriate page
+    navigate('/');
+  };
+
+  // Handle audio mute/unmute
+  const handleToggleAudio = () => {
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsAudioMuted(!audioTrack.enabled);
+      }
     }
   };
 
@@ -318,15 +349,15 @@ const VideoRoom = () => {
           <div className="mt-6 flex justify-center space-x-4">
             <button 
               className="control-button bg-red-500 text-white"
-              onClick={() => {/* Add end call logic */}}
+              onClick={handleEndCall}
             >
               End Call
             </button>
             <button 
-              className="control-button bg-gray-600 text-white"
-              onClick={() => {/* Add mute logic */}}
+              className={`control-button ${isAudioMuted ? 'bg-red-500' : 'bg-gray-600'} text-white`}
+              onClick={handleToggleAudio}
             >
-              Mute
+              {isAudioMuted ? 'Unmute' : 'Mute'}
             </button>
             <button 
               className="control-button bg-gray-600 text-white"
@@ -340,4 +371,5 @@ const VideoRoom = () => {
     </>
   );
 };
+
 export default VideoRoom;
