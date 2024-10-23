@@ -37,6 +37,21 @@ const rooms = new Map();
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id);
 
+  socket.on('get-user-info', async (userId) => {
+    try {
+      // Query your database for user info
+      const user = await db.users.findById(userId);
+      
+      // Emit user info back to all clients in the room
+      io.to(socket.roomId).emit('user-info', {
+        userId: userId,
+        userName: user.name // Or whatever field contains the user's name
+      });
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+    }
+  });
+
   // Join room handler
   socket.on("join-room", (roomId) => {
     console.log(`User ${socket.id} joining room ${roomId}`);

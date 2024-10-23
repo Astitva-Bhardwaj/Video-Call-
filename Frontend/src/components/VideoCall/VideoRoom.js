@@ -32,6 +32,11 @@ const VideoRoom = () => {
 
   // Create a new peer connection
   const createPeerConnection = (userId, stream) => {
+    if (peerConnectionsRef.current[userId]) {
+      console.log('Peer connection already exists for', userId);
+      return peerConnectionsRef.current[userId];
+    }
+
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -58,15 +63,19 @@ const VideoRoom = () => {
     // Handle incoming streams
     pc.ontrack = (event) => {
       console.log('Received remote stream from', userId);
+      const [remoteStream] = event.streams;
       setRemoteStreams(prev => ({
         ...prev,
-        [userId]: event.streams[0]
+        [userId]: remoteStream
       }));
     };
 
     // Log state changes for debugging
     pc.oniceconnectionstatechange = () => {
       console.log(`ICE Connection State with ${userId}:`, pc.iceConnectionState);
+      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+        handlePeerDisconnection(userId);
+      }
     };
 
     pc.onconnectionstatechange = () => {
@@ -77,7 +86,20 @@ const VideoRoom = () => {
       console.log(`Signaling State with ${userId}:`, pc.signalingState);
     };
 
+    peerConnectionsRef.current[userId] = pc;
     return pc;
+  };
+
+  const handlePeerDisconnection = (userId) => {
+    if (peerConnectionsRef.current[userId]) {
+      peerConnectionsRef.current[userId].close();
+      delete peerConnectionsRef.current[userId];
+      setRemoteStreams(prev => {
+        const newStreams = { ...prev };
+        delete newStreams[userId];
+        return newStreams;
+      });
+    }
   };
 
   useEffect(() => {
@@ -100,7 +122,6 @@ const VideoRoom = () => {
         socketRef.current.on('user-joined', async (userId) => {
           console.log('New user joined:', userId);
           const pc = createPeerConnection(userId, localStreamCopy);
-          peerConnectionsRef.current[userId] = pc;
 
           try {
             const offer = await pc.createOffer();
@@ -118,12 +139,8 @@ const VideoRoom = () => {
         // Handle receiving an offer
         socketRef.current.on('offer', async ({ userId, offer }) => {
           console.log('Received offer from', userId);
-          if (!peerConnectionsRef.current[userId]) {
-            const pc = createPeerConnection(userId, localStreamCopy);
-            peerConnectionsRef.current[userId] = pc;
-          }
+          const pc = createPeerConnection(userId, localStreamCopy);
 
-          const pc = peerConnectionsRef.current[userId];
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
             const answer = await pc.createAnswer();
@@ -166,15 +183,7 @@ const VideoRoom = () => {
         // Handle user disconnect
         socketRef.current.on('user-left', (userId) => {
           console.log('User left:', userId);
-          if (peerConnectionsRef.current[userId]) {
-            peerConnectionsRef.current[userId].close();
-            delete peerConnectionsRef.current[userId];
-          }
-          setRemoteStreams(prev => {
-            const newStreams = { ...prev };
-            delete newStreams[userId];
-            return newStreams;
-          });
+          handlePeerDisconnection(userId);
         });
 
       } catch (err) {
@@ -194,36 +203,141 @@ const VideoRoom = () => {
   }, [roomId]);
 
   return (
-    <div className="video-room">
-      <h2>Meeting Room: {roomId}</h2>
-      {error && <div className="error-message">{error}</div>}
-      <div className="video-grid">
-        <div className="video-container">
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className="video-element"
-          />
-          <div className="video-label">You</div>
-        </div>
-        {Object.entries(remoteStreams).map(([userId, stream]) => (
-          <div key={userId} className="video-container">
-            <video
-              autoPlay
-              playsInline
-              ref={el => {
-                if (el) el.srcObject = stream;
-              }}
-              className="video-element"
-            />
-            <div className="video-label">User {userId.slice(0, 4)}</div>
+    <>
+      <style>
+        {`
+          .video-container {
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            background-color: #1f2937;
+            border-radius: 0.5rem;
+            overflow: hidden;
+          }
+
+          .video-element {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+
+          .video-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+          }
+
+          .video-grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(1, 1fr);
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+          }
+
+          @media (min-width: 640px) {
+            .video-grid {
+              grid-template-columns: repeat(2, 1fr);
+            }
+          }
+
+          @media (min-width: 1024px) {
+            .video-grid {
+              grid-template-columns: repeat(3, 1fr);
+            }
+          }
+
+          .control-button {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            transition: all 0.2s;
+          }
+
+          .control-button:hover {
+            opacity: 0.9;
+          }
+        `}
+      </style>
+
+      <div className="min-h-screen bg-gray-900 p-4">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-6 text-center">
+            <h2 className="text-2xl font-semibold text-white mb-2">
+              Meeting Room: {roomId}
+            </h2>
+            {error && (
+              <div className="bg-red-500 text-white px-4 py-2 rounded-md">
+                {error}
+              </div>
+            )}
           </div>
-        ))}
+
+          {/* Video Grid */}
+          <div className="video-grid">
+            {/* Local Video */}
+            <div className="video-container">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="video-element"
+              />
+              <div className="video-label">You</div>
+            </div>
+
+            {/* Remote Videos */}
+            {Object.entries(remoteStreams).map(([userId, stream]) => (
+              <div key={userId} className="video-container">
+                <video
+                  autoPlay
+                  playsInline
+                  ref={el => {
+                    if (el) el.srcObject = stream;
+                  }}
+                  className="video-element"
+                />
+                <div className="video-label">User {userId.slice(0, 4)}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Controls */}
+          <div className="mt-6 flex justify-center space-x-4">
+            <button 
+              className="control-button bg-red-500 text-white"
+              onClick={() => {/* Add end call logic */}}
+            >
+              End Call
+            </button>
+            <button 
+              className="control-button bg-gray-600 text-white"
+              onClick={() => {/* Add mute logic */}}
+            >
+              Mute
+            </button>
+            <button 
+              className="control-button bg-gray-600 text-white"
+              onClick={() => {/* Add video toggle logic */}}
+            >
+              Stop Video
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
-
 export default VideoRoom;
