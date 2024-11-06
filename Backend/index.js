@@ -45,7 +45,7 @@ io.on("connection", (socket) => {
       // Emit user info back to all clients in the room
       io.to(socket.roomId).emit('user-info', {
         userId: userId,
-        userName: user.name // Or whatever field contains the user's name
+        userName: user.name 
       });
     } catch (error) {
       console.error('Error fetching user info:', error);
