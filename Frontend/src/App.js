@@ -29,7 +29,7 @@ function App() {
           {/* Main Content */}
           <Box component="main" sx={{ flexGrow: 1 }}>
             <Routes>
-              <Route path="/" element={<Login />} />
+              <Route path="/" element={<Register />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<Dashboard />} />
